@@ -248,8 +248,6 @@ export const rules = [
 
           const matches = titleArr.filter((t) => compareArr.indexOf(t) !== -1);
 
-          if (matches.length < 1) console.log(titleArr, compareArr);
-
           tester.lint(70, assert.ok, matches.length >= 1, `H1 tag should have at least 1 word from your title tag.`);
         }
       } else {
