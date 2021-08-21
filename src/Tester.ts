@@ -5,9 +5,17 @@ import fs from 'fs';
 import path from 'path';
 import { rules as pkgRules } from './rules';
 
+// which rules to run for a page containing meta refresh
+export const enum MetaRefreshRulePreference {
+  All       = 'all',       // run all rules
+  Supported = 'supported', // rules that supportsMetaRefresh
+  None      = 'none',      // run no rules
+};
+
 export const defaultPreferences = {
   internalLinksLowerCase: true,
   internalLinksTrailingSlash: true,
+  metaRefreshRules: MetaRefreshRulePreference.Supported as MetaRefreshRulePreference,
 };
 
 const getHtmlFiles = (p): string[] => {
@@ -51,6 +59,7 @@ type TMessage = {
 const emptyRule = {
   name: '',
   description: '',
+  supportsMetaRefresh: false,
   success: false as boolean,
   errors: [] as TMessage[],
   warnings: [] as TMessage[],
@@ -74,7 +83,7 @@ export const Tester = function ({
   display = ['errors', 'warnings'],
   siteWide = false,
   host = '',
-  preferences = {},
+  preferences = {} as any,
 }) {
   preferences = { ...defaultPreferences, ...preferences };
   this.currentRule = JSON.parse(JSON.stringify(emptyRule));
@@ -185,6 +194,7 @@ export const Tester = function ({
         linkTags: $attributes($, 'link'),
         ps: $attributes($, 'p'),
       };
+      const metaRefresh = result.meta.filter((m) => m['http-equiv'] && m['http-equiv'].toLowerCase() === 'refresh');
 
       if (siteWide) {
         siteWideLinks.set(url, result.aTags);
@@ -207,19 +217,37 @@ export const Tester = function ({
           .filter((a) => a.href !== this.currentUrl)
           .map((a) => a.href)
           .forEach((a) => internalLinks.push([a, this.currentUrl]));
+        metaRefresh
+          .filter((m) => m.content && m.content.includes('url='))
+          .map((m) => m.content.split('=')[1])
+          .filter((u) => !u.includes('http'))
+          .filter((u) => {
+            if (this.currentUrl !== '/') {
+              return !u.endsWith(this.currentUrl);
+            }
+            return true;
+          })
+          .filter((u) => u !== this.currentUrl)
+          .forEach((u) => internalLinks.push([u, this.currentUrl]));
       }
 
       for (let i = 0; i < rulesToUse.length; i++) {
         const rule = rulesToUse[i];
-        startRule(rule);
-        await rule.validator(
-          { result, response: { url, host }, preferences },
-          {
-            test: runTest(70, 'errors'),
-            lint: runTest(40, 'warnings'),
-          },
-        );
-        finishRule();
+
+        if (!metaRefresh.length ||
+            (preferences.metaRefreshRules == MetaRefreshRulePreference.All ||
+            (preferences.metaRefreshRules == MetaRefreshRulePreference.Supported && rule.supportsMetaRefresh))
+        ) {
+          startRule(rule);
+          await rule.validator(
+            { result, response: { url, host }, preferences },
+            {
+              test: runTest(70, 'errors'),
+              lint: runTest(40, 'warnings'),
+            },
+          );
+          finishRule();
+        }
       }
 
       const validDisplay = ['warnings', 'errors'];

@@ -15,6 +15,7 @@ export const rules = [
   {
     name: 'Canonical Tag',
     description: `Validates that the canonical tag is well formed, that there isn't multiple, and that it matches the url crawled.`,
+    supportsMetaRefresh: true,
     testData: {
       preferences: defaultPreferences,
       response: {
@@ -34,7 +35,13 @@ export const rules = [
         `There should be 1 and only 1 canonical tag, currently there are ${canonicals.length}`,
       );
       if (canonicals[0]) {
-        const { url, host } = payload.response;
+        let { url, host } = payload.response;
+        const metaRefresh = payload.result.meta.filter((m) => m['http-equiv'] && m['http-equiv'].toLowerCase() === 'refresh');
+
+        if (metaRefresh[0] && metaRefresh[0].content.includes('=')) {
+          url = metaRefresh[0].content.split('=')[1];
+        }
+
         tester.test(
           100,
           assert.ok,
@@ -184,6 +191,43 @@ export const rules = [
             'Meta description should include at least 1 of the words in the title tag.',
           );
         }
+      }
+    },
+  },
+  {
+    name: 'Meta refresh',
+    description: `Validate that a page containing meta refresh tags has suitable destination and duration.`,
+    supportsMetaRefresh: true,
+    testData: {
+      preferences: defaultPreferences,
+      result: {
+        meta: [
+          {
+            'http-equiv': 'refresh',
+            content: '0; url=https://nicholasreese.com/',
+          },
+        ],
+      },
+    },
+    validator: async (payload, tester) => {
+      const metas = payload.result.meta.filter((m) => m['http-equiv'] && m['http-equiv'].toLowerCase() === 'refresh');
+
+      if (metas.length) {
+        tester.test(
+          90,
+          assert.ok,
+          metas.length === 1,
+          `There should be maximum 1 meta refresh. Currently there are ${metas.length}`,
+        );
+      }
+
+      if (metas[0]) {
+        tester.test(90, assert.ok, metas[0] && metas[0].content, 'Meta refresh content="" should not be missing.');
+        tester.test(90, assert.notStrictEqual, metas[0].content.length, 0, 'Meta refresh should not be empty');
+        tester.test(100, assert.ok, !metas[0].content.includes('undefined'), `Meta refresh includes "undefined"`);
+        tester.test(100, assert.ok, !metas[0].content.includes('null'), `Meta refresh includes "null"`);
+        tester.test(90, assert.ok, metas[0].content.includes('url='), `Meta refresh should include a destination url`);
+        tester.test(90, assert.match, metas[0].content, /^0(;|$)/, 'Meta refresh duration should be 0');
       }
     },
   },
