@@ -75,7 +75,7 @@ export const rules = [
           90,
           assert.strictEqual,
           titles[0].innerText,
-          titles[0].innerHTML,
+          titles[0].innerHTML.replace(/&amp;/g, '&'), // &amp; remains encoded
           'The title tag should not wrap other tags. (innerHTML and innerText should match)',
         );
         tester.test(100, assert.notStrictEqual, titles[0].innerText.length, 0, 'Title tags should not be empty');
