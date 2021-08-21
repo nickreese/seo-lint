@@ -261,7 +261,7 @@ export const Tester = function ({
       const parsedFolder = path.parse(path.resolve(folder));
       const normalizedFolder = `${parsedFolder.dir}/${parsedFolder.base}`;
 
-      const files = getHtmlFiles(`${normalizedFolder}`);
+      const files = getHtmlFiles(normalizedFolder);
 
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
