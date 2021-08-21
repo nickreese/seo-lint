@@ -208,6 +208,7 @@ export const Tester = function ({
         result.aTags
           .filter((a) => !!a.href)
           .filter((a) => !a.href.includes('http'))
+          .filter((a) => !a.href.includes('mailto:'))
           .filter((a) => {
             if (this.currentUrl !== '/') {
               return !a.href.endsWith(this.currentUrl);
@@ -215,7 +216,8 @@ export const Tester = function ({
             return true;
           })
           .filter((a) => a.href !== this.currentUrl)
-          .map((a) => a.href)
+          .map((a) => a.href.replace(/#.+$/, '')) // remove fragment
+          .filter(Boolean) // remove now empty fragment-only links
           .forEach((a) => internalLinks.push([a, this.currentUrl]));
         metaRefresh
           .filter((m) => m.content && m.content.includes('url='))
@@ -228,6 +230,8 @@ export const Tester = function ({
             return true;
           })
           .filter((u) => u !== this.currentUrl)
+          .map((u) => u.replace(/#.+$/, '')) // remove fragment
+          .filter(Boolean) // remove now empty fragment-only links
           .forEach((u) => internalLinks.push([u, this.currentUrl]));
       }
 
