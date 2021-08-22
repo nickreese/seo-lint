@@ -207,6 +207,10 @@ export const Tester = function ({
         }
         result.aTags
           .filter((a) => !!a.href)
+          .map((a) => {
+            a.href = a.href.replace(new RegExp(`https?://${host}`), '');
+            return a;
+          })
           .filter((a) => !a.href.includes('http'))
           .filter((a) => !a.href.includes('mailto:'))
           .filter((a) => {
@@ -221,7 +225,7 @@ export const Tester = function ({
           .forEach((a) => internalLinks.push([a, this.currentUrl]));
         metaRefresh
           .filter((m) => m.content && m.content.includes('url='))
-          .map((m) => m.content.split('=')[1])
+          .map((m) => m.content.split('=')[1].replace(new RegExp(`https?://${host}`), ''))
           .filter((u) => !u.includes('http'))
           .filter((u) => {
             if (this.currentUrl !== '/') {
