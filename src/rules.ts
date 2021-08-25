@@ -1,15 +1,7 @@
 import assert from 'assert';
 import { defaultPreferences } from './Tester';
 
-const cleanString = (str) =>
-  str
-    .toLowerCase()
-    .replace('|', '')
-    .replace('-', '')
-    .replace('.', '')
-    .replace(':', '')
-    .replace('!', '')
-    .replace('?', '');
+const cleanString = (str) => str.toLowerCase().replace(/[-|.,:!?…]/g, '');
 
 export const rules = [
   {
