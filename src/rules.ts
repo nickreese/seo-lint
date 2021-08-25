@@ -1,20 +1,13 @@
 import assert from 'assert';
 import { defaultPreferences } from './Tester';
 
-const cleanString = (str) =>
-  str
-    .toLowerCase()
-    .replace('|', '')
-    .replace('-', '')
-    .replace('.', '')
-    .replace(':', '')
-    .replace('!', '')
-    .replace('?', '');
+const cleanString = (str) => str.toLowerCase().replace(/[-|.,:!?…]/g, '');
 
 export const rules = [
   {
     name: 'Canonical Tag',
     description: `Validates that the canonical tag is well formed, that there isn't multiple, and that it matches the url crawled.`,
+    supportsMetaRefresh: true,
     testData: {
       preferences: defaultPreferences,
       response: {
@@ -34,7 +27,13 @@ export const rules = [
         `There should be 1 and only 1 canonical tag, currently there are ${canonicals.length}`,
       );
       if (canonicals[0]) {
-        const { url, host } = payload.response;
+        let { url, host } = payload.response;
+        const metaRefresh = payload.result.meta.filter((m) => m['http-equiv'] && m['http-equiv'].toLowerCase() === 'refresh');
+
+        if (metaRefresh[0] && metaRefresh[0].content.includes('=')) {
+          url = metaRefresh[0].content.split('=')[1];
+        }
+
         tester.test(
           100,
           assert.ok,
@@ -75,7 +74,7 @@ export const rules = [
           90,
           assert.strictEqual,
           titles[0].innerText,
-          titles[0].innerHTML,
+          titles[0].innerHTML.replace(/&amp;/g, '&'), // &amp; remains encoded
           'The title tag should not wrap other tags. (innerHTML and innerText should match)',
         );
         tester.test(100, assert.notStrictEqual, titles[0].innerText.length, 0, 'Title tags should not be empty');
@@ -188,6 +187,43 @@ export const rules = [
     },
   },
   {
+    name: 'Meta refresh',
+    description: `Validate that a page containing meta refresh tags has suitable destination and duration.`,
+    supportsMetaRefresh: true,
+    testData: {
+      preferences: defaultPreferences,
+      result: {
+        meta: [
+          {
+            'http-equiv': 'refresh',
+            content: '0; url=https://nicholasreese.com/',
+          },
+        ],
+      },
+    },
+    validator: async (payload, tester) => {
+      const metas = payload.result.meta.filter((m) => m['http-equiv'] && m['http-equiv'].toLowerCase() === 'refresh');
+
+      if (metas.length) {
+        tester.test(
+          90,
+          assert.ok,
+          metas.length === 1,
+          `There should be maximum 1 meta refresh. Currently there are ${metas.length}`,
+        );
+      }
+
+      if (metas[0]) {
+        tester.test(90, assert.ok, metas[0] && metas[0].content, 'Meta refresh content="" should not be missing.');
+        tester.test(90, assert.notStrictEqual, metas[0].content.length, 0, 'Meta refresh should not be empty');
+        tester.test(100, assert.ok, !metas[0].content.includes('undefined'), `Meta refresh includes "undefined"`);
+        tester.test(100, assert.ok, !metas[0].content.includes('null'), `Meta refresh includes "null"`);
+        tester.test(90, assert.ok, metas[0].content.includes('url='), `Meta refresh should include a destination url`);
+        tester.test(90, assert.match, metas[0].content, /^0(;|$)/, 'Meta refresh duration should be 0');
+      }
+    },
+  },
+  {
     name: 'HTags',
     description: `Validate that H tags are being used properly.`,
     testData: {
@@ -247,8 +283,6 @@ export const rules = [
             .filter((i) => [':', '|', '-'].indexOf(i) === -1);
 
           const matches = titleArr.filter((t) => compareArr.indexOf(t) !== -1);
-
-          if (matches.length < 1) console.log(titleArr, compareArr);
 
           tester.lint(70, assert.ok, matches.length >= 1, `H1 tag should have at least 1 word from your title tag.`);
         }
